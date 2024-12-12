@@ -1,7 +1,9 @@
 import streamlit as st
 from grewpy import Corpus, CorpusDraft, Request, grew_web
 from grewpy.grew_web import Grew_web
+import conllu
 import os
+
 
 @st.cache_resource
 def load_corpus(corpus_path):
@@ -21,7 +23,7 @@ if 'results' not in st.session_state:
     st.session_state['results'] = None
 
 if 'current_index' not in st.session_state:
-    st.session_state['current_index'] = 1
+    st.session_state['current_index'] = 0
 
 
 @st.cache_data(show_spinner=True)
@@ -29,19 +31,34 @@ def load_corpus(corpus_path):
     return Corpus(corpus_path)
 
 
-def next_result():
-    if st.session_state.current_index + 1 >= len(st.session_state.results):
-        st.session_state.current_index = 0
-    else:
-        st.session_state.current_index += 1
+def export_conllu():
+    csents = []
 
-def previous_result():
-    if st.session_state.current_index > 0:
-        st.session_state.current_index -= 1
+    for res in st.session_state['results']:
+        s = conllu.parse(corpus[res['sent_id']].to_conll())[0]
+        for k,m in res['matching']['nodes'].items():
+            i = int(m) - 1
+            node = s[i]
+            print(node['misc'])
+            try:
+                node['misc']['mark'] = k
+            except TypeError:
+                node['misc'] = {'mark' : k}
+        csents.append(s.serialize())
+    return ''.join(csents)
+
+# def next_result():
+#     if st.session_state.current_index + 1 >= len(st.session_state.results):
+#         st.session_state.current_index = 0
+#     else:
+#         st.session_state.current_index += 1
+
+# def previous_result():
+#     if st.session_state.current_index > 0:
+#         st.session_state.current_index -= 1
 
 def go_to_result():
     i = st.session_state.go_to - 1
-    # if i in range(0, len(st.session_state.results)):
     st.session_state.current_index = int(i)
 
 CorpusTab, QueryTab = st.tabs(["Load corpus", "Query"])
@@ -77,14 +94,19 @@ with QueryTab:
     
     if query_button and query_pattern and corpus:
         req = Request(query_pattern)
+        if without:
+            req.without(without)
         # st.write(without)
         
         st.session_state['results'] = corpus.search(req, deco=True)
         st.session_state['current_index'] = 0
+        if not st.session_state['results']:
+            st.warning("No results found")
+
 
     if st.session_state['results']:
         st.success(f"There are {len(st.session_state['results'])} results!")
-        prog = st.session_state['current_index'] / len(st.session_state['results'])
+        prog = (st.session_state['current_index'] + 1) / len(st.session_state['results'])
         st.progress(prog, text=f"{st.session_state['current_index'] + 1}")
         r = st.session_state['results'][st.session_state['current_index']]
         s = corpus[r['sent_id']]
@@ -98,21 +120,30 @@ with QueryTab:
         col1, col2, col3 = st.columns([1, 1, 1])
         # prev = QueryTab.button("Previous", on_click=previous_result())
         # next = QueryTab.button("Netxt", on_click=next_result())
-        with col1:
-            if st.button("⏮️ Previous", on_click=previous_result):
-                pass
+        # with col1:
+        #     if st.button("⏮️ Previous", on_click=previous_result):
+        #         pass
 
-        with col2:
-            if st.button("Next ⏭️", on_click=next_result):
-                pass
+        # with col2:
+        #     if st.button("Next ⏭️", on_click=next_result):
+        #         pass
 
-        with col3:
-            if st.number_input("Go to", 
-                               min_value=1,
-                               max_value=len(st.session_state.results),
-                               step = 1,
-                               key="go_to", on_change=go_to_result):
-                pass
+    
+        if st.number_input("Go to", 
+                            min_value=1,
+                            max_value=len(st.session_state.results),
+                            step = 1,
+                            key="go_to", on_change=go_to_result):
+            pass
 
-    else:
-        st.warning("No results found")
+        
+        st.markdown("### Export results")
+        conllu_button = st.download_button(label='Conllu',
+                                            data = export_conllu(),
+                                            file_name="results.conllu")
+        
+        # treethtml_button = st.download_button(label='Text trees',
+        #                                     data = export_textmodetrees(),
+        #                                     file_name="results_texttrees.html")
+        
+            
