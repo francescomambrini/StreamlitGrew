@@ -1,0 +1,11 @@
+[project]
+name = "streamlitgrew"
+version = "0.1.0"
+description = "A local Streamlit interface for querying treebanks with GrewPy"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "conllu>=6.0.0",
+    "grewpy==0.7.1",
+    "streamlit>=1.59.1",
+]

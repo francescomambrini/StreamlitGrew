@@ -1,8 +1,10 @@
 import streamlit as st
-from grewpy import Corpus, CorpusDraft, Request, grew_web
-from grewpy.grew_web import Grew_web
+from grewpy import Corpus
+from grewpy.grew import GrewError
 import conllu
 import os
+
+from request_builder import EmptyPatternError, build_request
 
 
 @st.cache_resource
@@ -86,22 +88,37 @@ with CorpusTab:
 
 with QueryTab:
     with QueryTab.form(key='query_form'):
-        query_pattern = st.text_area('Enter your GrewMatch patter')
-        without = st.text_input('Pattern to exclude (optional)')
+        query_pattern = st.text_area(
+            'GrewMatch pattern',
+            help='Enter only the contents of pattern { ... }, for example: X [lemma="amore"]',
+            placeholder='X [lemma="amore"]',
+        )
+        without = st.text_input(
+            'Pattern to exclude (optional)',
+            help='Enter only the contents of without { ... }, for example: X [upos=NOUN]',
+            placeholder='X [upos=NOUN]',
+        )
         # count = st.text_input('Group and count by')
-        query_button = st.form_submit_button(label='Submit query')
+        query_button = st.form_submit_button(
+            label='Submit query',
+            disabled=corpus is None,
+        )
 
-    
-    if query_button and query_pattern and corpus:
-        req = Request(query_pattern)
-        if without:
-            req.without(without)
-        # st.write(without)
-        
-        st.session_state['results'] = corpus.search(req, deco=True)
+
+    if query_button and corpus:
+        st.session_state['results'] = None
         st.session_state['current_index'] = 0
-        if not st.session_state['results']:
-            st.warning("No results found")
+
+        try:
+            req = build_request(query_pattern, without)
+            st.session_state['results'] = corpus.search(req, deco=True)
+        except EmptyPatternError as error:
+            st.warning(str(error))
+        except GrewError as error:
+            st.error(f"Invalid GrewMatch query: {error}")
+        else:
+            if not st.session_state['results']:
+                st.warning("No results found")
 
 
     if st.session_state['results']:
