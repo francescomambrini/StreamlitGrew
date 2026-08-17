@@ -1,9 +1,9 @@
 import streamlit as st
 from grewpy import Corpus
 from grewpy.grew import GrewError
-import conllu
 import os
 
+from conllu_export import ConlluExportError, build_conllu_export
 from request_builder import EmptyPatternError, build_request
 
 
@@ -27,27 +27,14 @@ if 'results' not in st.session_state:
 if 'current_index' not in st.session_state:
     st.session_state['current_index'] = 0
 
+if 'request_preview' not in st.session_state:
+    st.session_state['request_preview'] = None
+
 
 @st.cache_data(show_spinner=True)
 def load_corpus(corpus_path):
     return Corpus(corpus_path)
 
-
-def export_conllu():
-    csents = []
-
-    for res in st.session_state['results']:
-        s = conllu.parse(corpus[res['sent_id']].to_conll())[0]
-        for k,m in res['matching']['nodes'].items():
-            i = int(m) - 1
-            node = s[i]
-            print(node['misc'])
-            try:
-                node['misc']['mark'] = k
-            except TypeError:
-                node['misc'] = {'mark' : k}
-        csents.append(s.serialize())
-    return ''.join(csents)
 
 # def next_result():
 #     if st.session_state.current_index + 1 >= len(st.session_state.results):
@@ -93,10 +80,13 @@ with QueryTab:
             help='Enter only the contents of pattern { ... }, for example: X [lemma="amore"]',
             placeholder='X [lemma="amore"]',
         )
-        without = st.text_input(
-            'Pattern to exclude (optional)',
-            help='Enter only the contents of without { ... }, for example: X [upos=NOUN]',
-            placeholder='X [upos=NOUN]',
+        without = st.text_area(
+            'Exclusion pattern (optional)',
+            help=(
+                'Enter the contents of one without { ... } block. All clauses in '
+                'this block must match together for an occurrence to be excluded.'
+            ),
+            placeholder='X [upos=NOUN];\nX -[nsubj]-> Y',
         )
         # count = st.text_input('Group and count by')
         query_button = st.form_submit_button(
@@ -108,9 +98,11 @@ with QueryTab:
     if query_button and corpus:
         st.session_state['results'] = None
         st.session_state['current_index'] = 0
+        st.session_state['request_preview'] = None
 
         try:
             req = build_request(query_pattern, without)
+            st.session_state['request_preview'] = str(req)
             st.session_state['results'] = corpus.search(req, deco=True)
         except EmptyPatternError as error:
             st.warning(str(error))
@@ -119,6 +111,10 @@ with QueryTab:
         else:
             if not st.session_state['results']:
                 st.warning("No results found")
+
+    if st.session_state['request_preview']:
+        with st.expander("Generated Grew request"):
+            st.code(st.session_state['request_preview'], language="text")
 
 
     if st.session_state['results']:
@@ -155,9 +151,14 @@ with QueryTab:
 
         
         st.markdown("### Export results")
-        conllu_button = st.download_button(label='Conllu',
-                                            data = export_conllu(),
-                                            file_name="results.conllu")
+        try:
+            conllu_export = build_conllu_export(corpus, st.session_state['results'])
+        except ConlluExportError as error:
+            st.error(f"Could not export results: {error}")
+        else:
+            st.download_button(label='CoNLL-U',
+                               data=conllu_export,
+                               file_name="results.conllu")
         
         # treethtml_button = st.download_button(label='Text trees',
         #                                     data = export_textmodetrees(),

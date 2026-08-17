@@ -64,6 +64,9 @@ pattern { X [lemma="amore"] }
 ```
 
 The app constructs the complete request through the GrewPy 0.7.1 builder API.
+The exclusion editor represents one `without { ... }` block and supports
+multiple semicolon-separated clauses. After submission, the app shows the
+complete generated request in an expandable preview.
 
 ## Test
 
