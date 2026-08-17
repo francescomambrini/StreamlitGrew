@@ -9,7 +9,7 @@ from request_builder import EmptyPatternError, build_request
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SAMPLE_CORPUS = PROJECT_ROOT / "test" / "it_old-ud-test.conllu"
+SAMPLE_CORPUS = PROJECT_ROOT / "test_data" / "it_old-ud-test.conllu"
 
 
 class RequestBuilderTests(unittest.TestCase):
